@@ -71,13 +71,13 @@ pipeline {
             steps {
                 echo '🚀 Déploiement sur Kubernetes...'
                 withKubeConfig([credentialsId: 'kubeconfig-jenkins']) {
-                    sh 'kubectl apply -f devop/DEvop-app/kubernet/mongo-deployment.yaml'
-                    sh 'kubectl apply -f devop/DEvop-app/kubernet/mongo-service.yaml'
-                    sh 'kubectl apply -f devop/DEvop-app/kubernet/backend-deployment.yaml'
-                    sh 'kubectl apply -f devop/DEvop-app/kubernet/backend-service.yaml'
-                    sh 'kubectl apply -f devop/DEvop-app/kubernet/frontend-deployment.yaml'
-                    sh 'kubectl apply -f devop/DEvop-app/kubernet/frontend-service.yaml'
-                    sh 'kubectl apply -f devop/DEvop-app/kubernet/ingress.yaml || echo "Pas d\'ingress"'
+                    sh 'kubectl apply -f kubernet/mongo-deployment.yaml'
+                    sh 'kubectl apply -f kubernet/mongo-service.yaml'
+                    sh 'kubectl apply -f kubernet/backend-deployment.yaml'
+                    sh 'kubectl apply -f kubernet/backend-service.yaml'
+                    sh 'kubectl apply -f kubernet/frontend-deployment.yaml'
+                    sh 'kubectl apply -f kubernet/frontend-service.yaml'
+                    sh 'kubectl apply -f kubernet/ingress.yaml || echo "Pas d\'ingress"'
 
                     sh 'kubectl rollout status deployment/mongo'
                     sh 'kubectl rollout status deployment/backend'
