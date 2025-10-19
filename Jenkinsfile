@@ -19,7 +19,7 @@ pipeline {
             }
         }
 
-        stage('SonarCloud Analysis') {
+        stage('Analyse SonarCloud') {
             steps {
                 script {
                     echo '📊 Analyse SonarCloud...'
@@ -61,6 +61,7 @@ pipeline {
                             sh """
                                 docker build -t ${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:${BUILD_NUMBER} \
                                              -t ${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:latest \
+                                             --build-arg VITE_API_URL=http://backend-service:5000/api \
                                              -f Dockerfile .
                             """
                         }
@@ -91,30 +92,21 @@ pipeline {
             }
         }
 
-        stage('Deploy') {
+        stage('Déploiement Kubernetes') {
             steps {
-                script {
-                    echo '🚀 Déploiement...'
+                echo '🚀 Déploiement sur Kubernetes...'
+                withKubeConfig([credentialsId: 'kubeconfig-jenkins']) {
+                    sh 'kubectl apply -f kubernet/mongo-deployment.yaml'
+                    sh 'kubectl apply -f kubernet/mongo-service.yaml'
+                    sh 'kubectl apply -f kubernet/backend-deployment.yaml'
+                    sh 'kubectl apply -f kubernet/backend-service.yaml'
+                    sh 'kubectl apply -f kubernet/frontend-deployment.yaml'
+                    sh 'kubectl apply -f kubernet/frontend-service.yaml'
+                    sh 'kubectl apply -f kubernet/ingress.yaml || echo "Pas d\'ingress"'
 
-                    sh '''
-                        mkdir -p backend
-                        cat > backend/.env << 'ENVFILE'
-PORT=5000
-MONGO_URI=mongodb://mongo:27017/smartphoneDB
-DELETE_CODE=123
-ENVFILE
-                        echo "✅ Fichier .env créé"
-                        cat backend/.env
-                    '''
-
-                    sh """
-                        docker compose down --remove-orphans || true
-                        docker compose pull
-                        docker compose up -d
-                        sleep 10
-                        docker compose ps
-                        docker logs backend --tail 20
-                    """
+                    sh 'kubectl rollout status deployment/mongo'
+                    sh 'kubectl rollout status deployment/backend'
+                    sh 'kubectl rollout status deployment/frontend'
                 }
             }
         }
@@ -146,8 +138,8 @@ ENVFILE
 
                             <h3>🚀 Application</h3>
                             <ul>
-                                <li>Frontend: <a href="http://localhost">http://localhost</a></li>
-                                <li>Backend: <a href="http://localhost:5000/api/smartphones">http://localhost:5000/api/smartphones</a></li>
+                                <li>Frontend: <a href="http://smartphone.local">http://smartphone.local</a></li>
+                                <li>Backend: <a href="http://smartphone.local/api/smartphones">http://smartphone.local/api/smartphones</a></li>
                             </ul>
                         </body>
                         </html>
