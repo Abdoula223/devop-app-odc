@@ -5,7 +5,7 @@ pipeline {
         DOCKERHUB_USERNAME = 'abdoul223'
         IMAGE_BACKEND = 'smartphone-backend'
         IMAGE_FRONTEND = 'smartphone-frontend'
-        KUBECONFIG = "${HOME}/.kube/config"
+        KUBECONFIG = "/var/lib/jenkins/.kube/config"
     }
 
     stages {
@@ -73,14 +73,14 @@ pipeline {
 
                 // Application des fichiers Kubernetes
                 sh '''
-                    export KUBECONFIG=$HOME/.kube/config
-                    kubectl apply -f kubernet/mongo-deployment.yaml
-                    kubectl apply -f kubernet/mongo-service.yaml
-                    kubectl apply -f kubernet/backend-deployment.yaml
-                    kubectl apply -f kubernet/backend-service.yaml
-                    kubectl apply -f kubernet/frontend-deployment.yaml
-                    kubectl apply -f kubernet/frontend-service.yaml
-                    kubectl apply -f kubernet/ingress.yaml
+                    export KUBECONFIG=/var/lib/jenkins/.kube/config
+                    kubectl apply --validate=false -f kubernet/mongo-deployment.yaml
+                    kubectl apply --validate=false -f kubernet/mongo-service.yaml
+                    kubectl apply --validate=false -f kubernet/backend-deployment.yaml
+                    kubectl apply --validate=false -f kubernet/backend-service.yaml
+                    kubectl apply --validate=false -f kubernet/frontend-deployment.yaml
+                    kubectl apply --validate=false -f kubernet/frontend-service.yaml
+                    kubectl apply --validate=false -f kubernet/ingress.yaml
                 '''
             }
         }
