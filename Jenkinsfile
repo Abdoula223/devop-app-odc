@@ -5,6 +5,10 @@ pipeline {
         DOCKERHUB_USERNAME = 'abdoul223'
         IMAGE_BACKEND = 'smartphone-backend'
         IMAGE_FRONTEND = 'smartphone-frontend'
+
+        SONAR_HOST_URL = 'https://sonarcloud.io'
+        SONAR_PROJECT_KEY = 'Abdoula223_DEvop-app'
+        SONAR_ORGANIZATION = 'abdoula223'
     }
 
     stages {
@@ -12,6 +16,27 @@ pipeline {
             steps {
                 echo '📦 Récupération du code...'
                 checkout scm
+            }
+        }
+
+        stage('SonarCloud Analysis') {
+            steps {
+                script {
+                    echo '📊 Analyse SonarCloud...'
+                    withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
+                        sh """
+                            docker run --rm \
+                                -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
+                                -e SONAR_TOKEN="${SONAR_TOKEN}" \
+                                -v "\$(pwd):/usr/src" \
+                                sonarsource/sonar-scanner-cli \
+                                -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                                -Dsonar.organization=${SONAR_ORGANIZATION} \
+                                -Dsonar.sources=. \
+                                -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/*.test.js
+                        """
+                    }
+                }
             }
         }
 
@@ -36,7 +61,6 @@ pipeline {
                             sh """
                                 docker build -t ${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:${BUILD_NUMBER} \
                                              -t ${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:latest \
-                                             --build-arg VITE_API_URL=http://backend-service:5000/api \
                                              -f Dockerfile .
                             """
                         }
@@ -67,21 +91,30 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('Deploy') {
             steps {
-                echo '🚀 Déploiement sur Kubernetes...'
-                withKubeConfig([credentialsId: 'kubeconfig-jenkins']) {
-                    sh 'kubectl apply -f kubernet/mongo-deployment.yaml'
-                    sh 'kubectl apply -f kubernet/mongo-service.yaml'
-                    sh 'kubectl apply -f kubernet/backend-deployment.yaml'
-                    sh 'kubectl apply -f kubernet/backend-service.yaml'
-                    sh 'kubectl apply -f kubernet/frontend-deployment.yaml'
-                    sh 'kubectl apply -f kubernet/frontend-service.yaml'
-                    sh 'kubectl apply -f kubernet/ingress.yaml || echo "Pas d\'ingress"'
+                script {
+                    echo '🚀 Déploiement...'
 
-                    sh 'kubectl rollout status deployment/mongo'
-                    sh 'kubectl rollout status deployment/backend'
-                    sh 'kubectl rollout status deployment/frontend'
+                    sh '''
+                        mkdir -p backend
+                        cat > backend/.env << 'ENVFILE'
+PORT=5000
+MONGO_URI=mongodb://mongo:27017/smartphoneDB
+DELETE_CODE=123
+ENVFILE
+                        echo "✅ Fichier .env créé"
+                        cat backend/.env
+                    '''
+
+                    sh """
+                        docker compose down --remove-orphans || true
+                        docker compose pull
+                        docker compose up -d
+                        sleep 10
+                        docker compose ps
+                        docker logs backend --tail 20
+                    """
                 }
             }
         }
@@ -97,12 +130,24 @@ pipeline {
                         <html>
                         <body style="font-family: Arial, sans-serif;">
                             <h2 style="color: #28a745;">✅ Pipeline réussi !</h2>
+
+                            <h3>📋 Détails</h3>
                             <ul>
                                 <li><strong>Build:</strong> #${BUILD_NUMBER}</li>
                                 <li><strong>Durée:</strong> ${currentBuild.durationString}</li>
+                            </ul>
+
+                            <h3>🔗 Liens</h3>
+                            <ul>
+                                <li><a href="https://sonarcloud.io/project/overview?id=${SONAR_PROJECT_KEY}">📊 SonarCloud</a></li>
+                                <li><a href="https://hub.docker.com/r/${DOCKERHUB_USERNAME}">🐳 Docker Hub</a></li>
                                 <li><a href="${BUILD_URL}console">📄 Logs Jenkins</a></li>
-                                <li><a href="http://localhost">Frontend</a></li>
-                                <li><a href="http://localhost:5000/api/smartphones">Backend</a></li>
+                            </ul>
+
+                            <h3>🚀 Application</h3>
+                            <ul>
+                                <li>Frontend: <a href="http://localhost">http://localhost</a></li>
+                                <li>Backend: <a href="http://localhost:5000/api/smartphones">http://localhost:5000/api/smartphones</a></li>
                             </ul>
                         </body>
                         </html>
