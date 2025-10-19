@@ -1,6 +1,6 @@
 pipeline {
     agent any
-    
+
     environment {
         DOCKERHUB_USERNAME = 'abdoul223'
         IMAGE_BACKEND = 'smartphone-backend'
@@ -9,7 +9,7 @@ pipeline {
         SONAR_PROJECT_KEY = 'Abdoula223_DEvop-app'
         SONAR_ORGANIZATION = 'abdoula223'
     }
-    
+
     stages {
         stage('Checkout Code') {
             steps {
@@ -17,7 +17,7 @@ pipeline {
                 checkout scm
             }
         }
-        
+
         stage('SonarCloud Analysis') {
             steps {
                 script {
@@ -38,7 +38,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Build Images') {
             parallel {
                 stage('Build Backend') {
@@ -67,7 +67,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Push to Docker Hub') {
             steps {
                 script {
@@ -89,67 +89,48 @@ pipeline {
                 }
             }
         }
-        
-        stage('Deploy') {
+
+        stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    echo '🚀 Déploiement...'
-                    
-                    // Créer le .env EXACTEMENT comme avant
-                    sh '''
-                        mkdir -p backend
-                        cat > backend/.env << 'ENVFILE'
-PORT=5000
-MONGO_URI=mongodb://mongo:27017/smartphoneDB
-DELETE_CODE=123
-ENVFILE
-                        echo "✅ Fichier .env créé"
-                        cat backend/.env
-                    '''
-                    
+                    echo '🚀 Déploiement sur Kubernetes...'
+
+                    // Mise à jour dynamique des images dans les fichiers YAML
                     sh """
-                        docker compose down --remove-orphans || true
-                        docker compose pull
-                        docker compose up -d
-                        sleep 10
-                        docker compose ps
-                        docker logs backend --tail 20
+                        sed -i 's|${DOCKERHUB_USERNAME}/${IMAGE_BACKEND}:.*|${DOCKERHUB_USERNAME}/${IMAGE_BACKEND}:${BUILD_NUMBER}|' kubernet/backend-deployment.yaml
+                        sed -i 's|${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:.*|${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:${BUILD_NUMBER}|' kubernet/frontend-deployment.yaml
+                    """
+
+                    // Application des fichiers Kubernetes
+                    sh """
+                        kubectl apply -f kubernet/mongo-deployment.yaml
+                        kubectl apply -f kubernet/mongo-service.yaml
+                        kubectl apply -f kubernet/backend-deployment.yaml
+                        kubectl apply -f kubernet/backend-service.yaml
+                        kubectl apply -f kubernet/frontend-deployment.yaml
+                        kubectl apply -f kubernet/frontend-service.yaml
+                        kubectl apply -f kubernet/ingress.yaml
                     """
                 }
             }
         }
     }
-    
+
     post {
         success {
             script {
                 echo '✅ Pipeline réussi !'
-                
-                // Email de succès
                 emailext(
                     subject: "✅ Jenkins SUCCESS - Build #${BUILD_NUMBER}",
                     body: """
                         <html>
                         <body style="font-family: Arial, sans-serif;">
                             <h2 style="color: #28a745;">✅ Pipeline réussi !</h2>
-                            
-                            <h3>📋 Détails</h3>
                             <ul>
                                 <li><strong>Build:</strong> #${BUILD_NUMBER}</li>
                                 <li><strong>Durée:</strong> ${currentBuild.durationString}</li>
-                            </ul>
-                            
-                            <h3>🔗 Liens</h3>
-                            <ul>
-                                <li><a href="https://sonarcloud.io/project/overview?id=Abdoula223_DEvop-app">📊 SonarCloud</a></li>
-                                <li><a href="https://hub.docker.com/r/${DOCKERHUB_USERNAME}">🐳 Docker Hub</a></li>
-                                <li><a href="${BUILD_URL}console">📄 Logs Jenkins</a></li>
-                            </ul>
-                            
-                            <h3>🚀 Application</h3>
-                            <ul>
-                                <li>Frontend: <a href="http://localhost">http://localhost</a></li>
-                                <li>Backend: <a href="http://localhost:5000/api/smartphones">http://localhost:5000/api/smartphones</a></li>
+                                <li><a href="http://smartphone.local">🌐 Accès à l'application</a></li>
+                                <li><a href="http://smartphone.local/api/smartphones">📦 API Smartphones</a></li>
                             </ul>
                         </body>
                         </html>
@@ -160,12 +141,10 @@ ENVFILE
                 )
             }
         }
-        
+
         failure {
             script {
                 echo '❌ Pipeline échoué !'
-                
-                // Email d'échec
                 emailext(
                     subject: "❌ Jenkins FAILED - Build #${BUILD_NUMBER}",
                     body: """
