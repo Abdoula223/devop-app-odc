@@ -8,6 +8,7 @@ pipeline {
         SONAR_HOST_URL = 'https://sonarcloud.io'
         SONAR_PROJECT_KEY = 'Abdoula223_DEvop-app'
         SONAR_ORGANIZATION = 'abdoula223'
+        KUBECONFIG = "${HOME}/.kube/config"
     }
 
     stages {
@@ -97,8 +98,8 @@ pipeline {
 
                     // Mise à jour dynamique des images dans les fichiers YAML
                     sh """
-                        sed -i 's|${DOCKERHUB_USERNAME}/${IMAGE_BACKEND}:.*|${DOCKERHUB_USERNAME}/${IMAGE_BACKEND}:${BUILD_NUMBER}|' kubernet/backend-deployment.yaml
-                        sed -i 's|${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:.*|${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:${BUILD_NUMBER}|' kubernet/frontend-deployment.yaml
+                        sed -i 's|image: ${DOCKERHUB_USERNAME}/${IMAGE_BACKEND}:.*|image: ${DOCKERHUB_USERNAME}/${IMAGE_BACKEND}:${BUILD_NUMBER}|' kubernet/backend-deployment.yaml
+                        sed -i 's|image: ${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:.*|image: ${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:${BUILD_NUMBER}|' kubernet/frontend-deployment.yaml
                     """
 
                     // Application des fichiers Kubernetes
