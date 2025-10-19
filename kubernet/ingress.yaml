@@ -2,24 +2,11 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: smartphone-ingress
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
-  tls:
-    - hosts:
-        - smartphone.local
-      secretName: smartphone-tls
   rules:
     - host: smartphone.local
       http:
         paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: frontend
-                port:
-                  number: 80
           - path: /api
             pathType: Prefix
             backend:
@@ -27,3 +14,10 @@ spec:
                 name: backend
                 port:
                   number: 5000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80
