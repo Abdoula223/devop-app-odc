@@ -7,7 +7,7 @@ pipeline {
         IMAGE_FRONTEND = 'smartphone-frontend'
 
         SONAR_HOST_URL = 'https://sonarcloud.io'
-        SONAR_PROJECT_KEY = 'Abdoula223_DEvop-app'
+        SONAR_PROJECT_KEY = 'Abdoula223/devop-app-odc'
         SONAR_ORGANIZATION = 'abdoula223'
     }
 
