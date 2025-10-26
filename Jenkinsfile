@@ -21,14 +21,11 @@ pipeline {
                     steps {
                         script {
                             echo '🔨 Construction Backend...'
-                            sh '''
-                                cd backend
-                                cp .env.example .env
-                                npm install
+                            sh """
                                 docker build -t ${DOCKERHUB_USERNAME}/${IMAGE_BACKEND}:${BUILD_NUMBER} \
                                              -t ${DOCKERHUB_USERNAME}/${IMAGE_BACKEND}:latest \
-                                             -f Dockerfile .
-                            '''
+                                             -f backend/Dockerfile ./backend
+                            """
                         }
                     }
                 }
@@ -37,15 +34,11 @@ pipeline {
                     steps {
                         script {
                             echo '🔨 Construction Frontend...'
-                            sh '''
-                                cd frontend
-                                npm install
-                                npm run build
+                            sh """
                                 docker build -t ${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:${BUILD_NUMBER} \
                                              -t ${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:latest \
-                                             --build-arg VITE_API_URL=http://backend-service:5000/api \
-                                             -f Dockerfile .
-                            '''
+                                             -f frontend/Dockerfile ./frontend
+                            """
                         }
                     }
                 }
@@ -61,7 +54,7 @@ pipeline {
                         usernameVariable: 'DOCKER_USER',
                         passwordVariable: 'DOCKER_PASS'
                     )]) {
-                        sh '''#!/bin/bash
+                        sh '''
                             echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
                             docker push ${DOCKERHUB_USERNAME}/${IMAGE_BACKEND}:${BUILD_NUMBER}
                             docker push ${DOCKERHUB_USERNAME}/${IMAGE_BACKEND}:latest
@@ -74,9 +67,46 @@ pipeline {
             }
         }
 
+        stage('Create .env') {
+            steps {
+                script {
+                    echo '🔐 Création du fichier .env...'
+                    sh '''
+                        mkdir -p backend
+                        cat > backend/.env << 'ENVFILE'
+PORT=5000
+MONGO_URI=mongodb://mongo:27017/smartphoneDB
+DELETE_CODE=123
+ENVFILE
+                        echo "✅ Fichier .env créé"
+                        cat backend/.env
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy Local (Docker Compose)') {
+            steps {
+                script {
+                    echo '🚀 Déploiement local avec Docker Compose...'
+                    sh '''
+                        docker compose down --remove-orphans || true
+                        docker compose pull
+                        docker compose up -d
+                        sleep 5
+                        docker compose ps
+                        docker logs backend --tail 20
+                    '''
+                }
+            }
+        }
+
         stage('Terraform Deploy') {
             steps {
-                dir('infra/terraform') {
+                script {
+                    echo '📦 Déploiement Kubernetes avec Terraform...'
+                }
+                dir('terraform') {
                     sh 'terraform init'
                     sh 'terraform apply -auto-approve'
                 }
@@ -86,60 +116,10 @@ pipeline {
 
     post {
         success {
-            script {
-                echo '✅ Pipeline réussi !'
-                emailext(
-                    subject: "✅ Jenkins SUCCESS - Build #${BUILD_NUMBER}",
-                    body: """
-                        <html>
-                        <body style="font-family: Arial, sans-serif;">
-                            <h2 style="color: #28a745;">✅ Pipeline réussi !</h2>
-
-                            <h3>📋 Détails</h3>
-                            <ul>
-                                <li><strong>Build:</strong> #${BUILD_NUMBER}</li>
-                                <li><strong>Durée:</strong> ${currentBuild.durationString}</li>
-                            </ul>
-
-                            <h3>🔗 Liens</h3>
-                            <ul>
-                                <li><a href="https://hub.docker.com/r/${DOCKERHUB_USERNAME}">🐳 Docker Hub</a></li>
-                                <li><a href="${BUILD_URL}console">📄 Logs Jenkins</a></li>
-                            </ul>
-
-                            <h3>🚀 Application</h3>
-                            <ul>
-                                <li>Frontend: <a href="http://smartphone.local">http://smartphone.local</a></li>
-                                <li>Backend: <a href="http://smartphone.local/api/smartphones">http://smartphone.local/api/smartphones</a></li>
-                            </ul>
-                        </body>
-                        </html>
-                    """,
-                    mimeType: 'text/html',
-                    to: 'oldpipa16@gmail.com',
-                    from: 'jenkins@devops.local'
-                )
-            }
+            echo '✅ Pipeline terminé avec succès !'
         }
-
         failure {
-            script {
-                echo '❌ Pipeline échoué !'
-                emailext(
-                    subject: "❌ Jenkins FAILED - Build #${BUILD_NUMBER}",
-                    body: """
-                        <html>
-                        <body style="font-family: Arial, sans-serif;">
-                            <h2 style="color: #dc3545;">❌ Pipeline échoué !</h2>
-                            <p><a href="${BUILD_URL}console">Consulter les logs</a></p>
-                        </body>
-                        </html>
-                    """,
-                    mimeType: 'text/html',
-                    to: 'oldpipa16@gmail.com',
-                    from: 'jenkins@devops.local'
-                )
-            }
+            echo '❌ Pipeline échoué. Vérifie les logs Jenkins.'
         }
     }
 }
