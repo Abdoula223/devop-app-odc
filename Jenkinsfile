@@ -37,7 +37,7 @@ pipeline {
                             sh """
                                 docker build -t ${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:${BUILD_NUMBER} \
                                              -t ${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:latest \
-                                             -f frontend/Dockerfile ./frontend
+                                             -f Dockerfile .
                             """
                         }
                     }
