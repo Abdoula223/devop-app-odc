@@ -24,17 +24,17 @@ pipeline {
                 script {
                     echo '📊 Analyse SonarCloud...'
                     withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
-                        sh """
+                        sh '''#!/bin/bash
                             docker run --rm \
-                                -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
-                                -e SONAR_TOKEN="${SONAR_TOKEN}" \
-                                -v "\$(pwd):/usr/src" \
+                                -e SONAR_HOST_URL=$SONAR_HOST_URL \
+                                -e SONAR_TOKEN=$SONAR_TOKEN \
+                                -v "$(pwd):/usr/src" \
                                 sonarsource/sonar-scanner-cli \
-                                -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                                -Dsonar.organization=${SONAR_ORGANIZATION} \
+                                -Dsonar.projectKey=Abdoula223/devop-app-odc \
+                                -Dsonar.organization=abdoula223 \
                                 -Dsonar.sources=. \
                                 -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/*.test.js
-                        """
+                        '''
                     }
                 }
             }
@@ -79,12 +79,12 @@ pipeline {
                         usernameVariable: 'DOCKER_USER',
                         passwordVariable: 'DOCKER_PASS'
                     )]) {
-                        sh '''
+                        sh '''#!/bin/bash
                             echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                            docker push ${DOCKERHUB_USERNAME}/${IMAGE_BACKEND}:${BUILD_NUMBER}
-                            docker push ${DOCKERHUB_USERNAME}/${IMAGE_BACKEND}:latest
-                            docker push ${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:${BUILD_NUMBER}
-                            docker push ${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:latest
+                            docker push abdoul223/smartphone-backend:'"$BUILD_NUMBER"'
+                            docker push abdoul223/smartphone-backend:latest
+                            docker push abdoul223/smartphone-frontend:'"$BUILD_NUMBER"'
+                            docker push abdoul223/smartphone-frontend:latest
                             docker logout
                         '''
                     }
@@ -96,17 +96,26 @@ pipeline {
             steps {
                 echo '🚀 Déploiement sur Kubernetes...'
                 withKubeConfig([credentialsId: 'kubeconfig-jenkins']) {
-                    sh 'kubectl apply -f kubernet/mongo-deployment.yaml'
-                    sh 'kubectl apply -f kubernet/mongo-service.yaml'
-                    sh 'kubectl apply -f kubernet/backend-deployment.yaml'
-                    sh 'kubectl apply -f kubernet/backend-service.yaml'
-                    sh 'kubectl apply -f kubernet/frontend-deployment.yaml'
-                    sh 'kubectl apply -f kubernet/frontend-service.yaml'
-                    sh 'kubectl apply -f kubernet/ingress.yaml || echo "Pas d\'ingress"'
+                    sh '''
+                        kubectl apply -f kubernet/mongo-deployment.yaml
+                        kubectl apply -f kubernet/mongo-service.yaml
+                        kubectl apply -f kubernet/backend-deployment.yaml
+                        kubectl apply -f kubernet/backend-service.yaml
+                        kubectl apply -f kubernet/frontend-deployment.yaml
+                        kubectl apply -f kubernet/frontend-service.yaml
+                        kubectl apply -f kubernet/ingress.yaml || echo "Pas d'ingress"
+                    '''
 
-                    sh 'kubectl rollout status deployment/mongo'
-                    sh 'kubectl rollout status deployment/backend'
-                    sh 'kubectl rollout status deployment/frontend'
+                    sh """
+                        kubectl set image deployment/backend backend=${DOCKERHUB_USERNAME}/${IMAGE_BACKEND}:${BUILD_NUMBER}
+                        kubectl set image deployment/frontend frontend=${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:${BUILD_NUMBER}
+                    """
+
+                    sh '''
+                        kubectl rollout status deployment/mongo
+                        kubectl rollout status deployment/backend
+                        kubectl rollout status deployment/frontend
+                    '''
                 }
             }
         }
