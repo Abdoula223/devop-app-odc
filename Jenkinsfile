@@ -5,10 +5,6 @@ pipeline {
         DOCKERHUB_USERNAME = 'abdoul223'
         IMAGE_BACKEND = 'smartphone-backend'
         IMAGE_FRONTEND = 'smartphone-frontend'
-
-        SONAR_HOST_URL = 'https://sonarcloud.io'
-        SONAR_PROJECT_KEY = 'Abdoula223/devop-app-odc'
-        SONAR_ORGANIZATION = 'abdoula223'
     }
 
     stages {
@@ -16,27 +12,6 @@ pipeline {
             steps {
                 echo '📦 Récupération du code...'
                 checkout scm
-            }
-        }
-
-        stage('Analyse SonarCloud') {
-            steps {
-                script {
-                    echo '📊 Analyse SonarCloud...'
-                    withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
-                        sh '''#!/bin/bash
-                            docker run --rm \
-                                -e SONAR_HOST_URL=$SONAR_HOST_URL \
-                                -e SONAR_TOKEN=$SONAR_TOKEN \
-                                -v "$(pwd):/usr/src" \
-                                sonarsource/sonar-scanner-cli \
-                                -Dsonar.projectKey=Abdoula223/devop-app-odc \
-                                -Dsonar.organization=abdoula223 \
-                                -Dsonar.sources=. \
-                                -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/*.test.js
-                        '''
-                    }
-                }
             }
         }
 
@@ -140,7 +115,6 @@ pipeline {
 
                             <h3>🔗 Liens</h3>
                             <ul>
-                                <li><a href="https://sonarcloud.io/project/overview?id=${SONAR_PROJECT_KEY}">📊 SonarCloud</a></li>
                                 <li><a href="https://hub.docker.com/r/${DOCKERHUB_USERNAME}">🐳 Docker Hub</a></li>
                                 <li><a href="${BUILD_URL}console">📄 Logs Jenkins</a></li>
                             </ul>
