@@ -21,24 +21,31 @@ pipeline {
                     steps {
                         script {
                             echo '🔨 Construction Backend...'
-                            sh """
+                            sh '''
+                                cd backend
+                                cp .env.example .env
+                                npm install
                                 docker build -t ${DOCKERHUB_USERNAME}/${IMAGE_BACKEND}:${BUILD_NUMBER} \
                                              -t ${DOCKERHUB_USERNAME}/${IMAGE_BACKEND}:latest \
-                                             -f backend/Dockerfile ./backend
-                            """
+                                             -f Dockerfile .
+                            '''
                         }
                     }
                 }
+
                 stage('Build Frontend') {
                     steps {
                         script {
                             echo '🔨 Construction Frontend...'
-                            sh """
+                            sh '''
+                                cd frontend
+                                npm install
+                                npm run build
                                 docker build -t ${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:${BUILD_NUMBER} \
                                              -t ${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:latest \
                                              --build-arg VITE_API_URL=http://backend-service:5000/api \
                                              -f Dockerfile .
-                            """
+                            '''
                         }
                     }
                 }
@@ -56,10 +63,10 @@ pipeline {
                     )]) {
                         sh '''#!/bin/bash
                             echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                            docker push abdoul223/smartphone-backend:'"$BUILD_NUMBER"'
-                            docker push abdoul223/smartphone-backend:latest
-                            docker push abdoul223/smartphone-frontend:'"$BUILD_NUMBER"'
-                            docker push abdoul223/smartphone-frontend:latest
+                            docker push ${DOCKERHUB_USERNAME}/${IMAGE_BACKEND}:${BUILD_NUMBER}
+                            docker push ${DOCKERHUB_USERNAME}/${IMAGE_BACKEND}:latest
+                            docker push ${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:${BUILD_NUMBER}
+                            docker push ${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:latest
                             docker logout
                         '''
                     }
@@ -67,30 +74,11 @@ pipeline {
             }
         }
 
-        stage('Déploiement Kubernetes') {
+        stage('Terraform Deploy') {
             steps {
-                echo '🚀 Déploiement sur Kubernetes...'
-                withKubeConfig([credentialsId: 'kubeconfig-jenkins']) {
-                    sh '''
-                        kubectl apply -f kubernet/mongo-deployment.yaml
-                        kubectl apply -f kubernet/mongo-service.yaml
-                        kubectl apply -f kubernet/backend-deployment.yaml
-                        kubectl apply -f kubernet/backend-service.yaml
-                        kubectl apply -f kubernet/frontend-deployment.yaml
-                        kubectl apply -f kubernet/frontend-service.yaml
-                        kubectl apply -f kubernet/ingress.yaml || echo "Pas d'ingress"
-                    '''
-
-                    sh """
-                        kubectl set image deployment/backend backend=${DOCKERHUB_USERNAME}/${IMAGE_BACKEND}:${BUILD_NUMBER}
-                        kubectl set image deployment/frontend frontend=${DOCKERHUB_USERNAME}/${IMAGE_FRONTEND}:${BUILD_NUMBER}
-                    """
-
-                    sh '''
-                        kubectl rollout status deployment/mongo
-                        kubectl rollout status deployment/backend
-                        kubectl rollout status deployment/frontend
-                    '''
+                dir('infra/terraform') {
+                    sh 'terraform init'
+                    sh 'terraform apply -auto-approve'
                 }
             }
         }
